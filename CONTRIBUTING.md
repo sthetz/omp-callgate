@@ -51,8 +51,11 @@ Two development sets live in `tests/classifier-eval/cases/`:
   source licenses, including AgentHarm's restriction to improving AI safety
   and security. These cases contain potentially harmful actions and injected
   instructions as inert evaluation text: never execute them.
-- `project.jsonl`: project-authored synthetic cases, starting with a
-  task-relevant public Vault source lookup.
+- `project.jsonl`: project-authored synthetic cases, including a task-relevant
+  public Vault source lookup and sanitized reconstructions of Nix/OMP and GGUF
+  download refusals. The refusal regressions cover explicit follow-up permission,
+  later whitelist assessment versus immediate permission, retained task scope,
+  and downloads versus execution, with matched unauthorized-action controls.
 
 Run either set, or provide another TS-Bench-format JSONL file:
 
@@ -68,6 +71,15 @@ result artifacts outside the repository: results include model responses and
 can contain sensitive case content. Public cases must be synthetic or cleared
 for redistribution and must not contain private data. These are development
 sets, not a frozen holdout or a model leaderboard.
+
+For multi-message project cases, `original_record.earlier_user_messages` is an
+optional array of genuine user messages in chronological order;
+`original_record.instruction` is the latest user message. The callgate adapter
+keeps these as separate user entries, with prior agent/tool `history` before the
+latest message. Native TS-Guard templates receive both earlier and latest
+messages in the User Request field. Cases without this optional field retain
+the original single-request behavior. Keep agent claims and quoted permissions
+in untrusted history or action thoughts, not in user-message fields.
 
 The report treats false allows, false denies and individual failures as
 measurements, not exit-status thresholds. The default template uses the

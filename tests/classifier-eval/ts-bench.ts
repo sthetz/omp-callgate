@@ -8,6 +8,7 @@ export type TsBenchExpectedOutcome = "allow" | "deny";
 
 export interface TsBenchOriginalRecord extends Record<string, unknown> {
   instruction: string;
+  earlier_user_messages?: string[];
   history: string;
   current_action: string;
   env_info: string;
@@ -82,6 +83,13 @@ function parseCase(value: unknown, line: number): TsBenchCase {
   }
   requiredString(original, "instruction", `${where}: original_record`);
   requiredString(original, "current_action", `${where}: original_record`);
+  if (
+    original.earlier_user_messages !== undefined &&
+    (!Array.isArray(original.earlier_user_messages) ||
+      original.earlier_user_messages.some((message) => typeof message !== "string" || !message.trim()))
+  ) {
+    throw new Error(`${where}: original_record.earlier_user_messages must be an array of non-empty strings`);
+  }
 
   return {
     caseId,
@@ -279,10 +287,12 @@ function toolResult(text: string, toolName: string, isDocumentation = false): Ts
 
 function buildSessionEntries(evalCase: TsBenchCase): TsBenchSessionEntry[] {
   const original = evalCase.originalRecord;
-  const entries: TsBenchSessionEntry[] = [
-    { type: "message", message: { role: "user", content: original.instruction } },
-    toolResult(original.env_info, "env_info", true),
-  ];
+  const earlier = original.earlier_user_messages ?? [];
+  const entries = (earlier.length ? earlier : [original.instruction]).map((content): TsBenchSessionEntry => ({
+    type: "message",
+    message: { role: "user", content },
+  }));
+  entries.push(toolResult(original.env_info, "env_info", true));
   for (const step of parseHistory(original.history)) {
     entries.push(
       {
@@ -297,6 +307,9 @@ function buildSessionEntries(evalCase: TsBenchCase): TsBenchSessionEntry[] {
       },
       toolResult(step.observation, step.actionName),
     );
+  }
+  if (earlier.length) {
+    entries.push({ type: "message", message: { role: "user", content: original.instruction } });
   }
   return entries;
 }

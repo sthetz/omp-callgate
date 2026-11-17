@@ -34,6 +34,32 @@ await test("native prompt retains full original context using Python dictionary 
   }
 });
 
+await test("native templates retain earlier task scope and follow-up permission as user evidence", () => {
+  for (const template of ["ts-guard", "ts-guard-callgate"] as const) {
+    const prompt = buildTsGuardPrompt(
+      {
+        instruction: "You have permission to download the model.",
+        earlier_user_messages: ["Document local model installation."],
+        history: "The tool rejected the download.",
+        current_action: "Download the selected GGUF.",
+        env_info: "",
+      },
+      template,
+    );
+    assert.ok(
+      prompt.includes(
+        "<<User Request>>\nEarlier user message 1:\nDocument local model installation.\n\n" +
+          "Latest user message:\nYou have permission to download the model.\n\n<<Agent Logs>>",
+      ),
+    );
+    const singleRequest = { instruction: "Only this request.", history: "", current_action: "", env_info: "" };
+    assert.equal(
+      buildTsGuardPrompt({ ...singleRequest, earlier_user_messages: [] }, template),
+      buildTsGuardPrompt(singleRequest, template),
+    );
+  }
+});
+
 await test("Python repr chooses quote delimiters and escapes nonprintable Unicode without losing context", () => {
   const cases = [
     ["plain", "'plain'"],

@@ -136,7 +136,14 @@ function pythonStringRepr(value: string): string {
 
 export function buildTsGuardPrompt(original: TsBenchOriginalRecord, template: TsGuardTemplate = "ts-guard"): string {
   const agentAction = `{'interaction_history': ${pythonStringRepr(original.history)}, 'current_action': ${pythonStringRepr(original.current_action)}}`;
-  const values = { user_request: original.instruction, agent_action: agentAction, env_info: original.env_info };
+  const earlier = original.earlier_user_messages ?? [];
+  const userRequest = earlier.length
+    ? [
+        ...earlier.map((message, index) => `Earlier user message ${index + 1}:\n${message}`),
+        `Latest user message:\n${original.instruction}`,
+      ].join("\n\n")
+    : original.instruction;
+  const values = { user_request: userRequest, agent_action: agentAction, env_info: original.env_info };
   // Substitute once: placeholder-looking text in the original context stays untouched.
   const promptTemplate = template === "ts-guard-callgate" ? TS_GUARD_CALLGATE_TEMPLATE : TS_GUARD_TEMPLATE;
   return promptTemplate.replace(
