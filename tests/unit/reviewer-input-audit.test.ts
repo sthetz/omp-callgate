@@ -20,7 +20,7 @@ await test("reviewer input auditing preserves request evidence without enabling 
       ? readFileSync(file, "utf8")
           .trim()
           .split("\n")
-          .map((line) => JSON.parse(line))
+          .map((line) => JSON.parse(line) as AuditEntry | ClassifierInputEntry)
       : [];
   const branch = [{ id: "u1", message: { role: "user", content: "Document model installation." } }];
   const context = ctx({
