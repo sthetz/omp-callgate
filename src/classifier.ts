@@ -1,8 +1,15 @@
-import type { CallgateConfig, ExtensionContextLike, ClassifierDecision, ReviewSubject } from "./types.js";
+import type {
+  CallgateConfig,
+  ExtensionContextLike,
+  ClassifierDecision,
+  ClassifierInputEntry,
+  ReviewSubject,
+} from "./types.js";
 import { buildProjectedContext } from "./context-projection.js";
 import type { CommandRule } from "./command-rules.js";
 import { buildSystemPrompt } from "./prompt.js";
-import { toRecord } from "./common.js";
+import { getString, toRecord } from "./common.js";
+import { writeAudit } from "./logging.js";
 
 export type ClassifierClient = (model: unknown, context: unknown, options: Record<string, unknown>) => Promise<unknown>;
 
@@ -183,7 +190,7 @@ export async function classifyAction(
   config: CallgateConfig,
   subject: ReviewSubject,
   client?: ClassifierClient,
-  context: { agentMessage?: string; rule?: CommandRule; ruleTextOnly?: boolean } = {},
+  context: { agentMessage?: string; rule?: CommandRule; ruleTextOnly?: boolean; toolCallId?: string } = {},
 ): Promise<ClassifierDecision> {
   const completeSimple = client ?? (await loadCompleteSimple());
 
@@ -193,27 +200,36 @@ export async function classifyAction(
   }
 
   const auth = await resolveRequestAuth(ctx, model);
+  const input: ClassifierInputEntry["input"] = {
+    systemPrompt: buildSystemPrompt(config),
+    messages: [
+      {
+        role: "user",
+        content: buildProjectedContext(ctx, subject, context),
+        timestamp: Date.now(),
+      },
+    ],
+  };
+  if (config.audit && config.auditReviewerInput) {
+    const record = toRecord(model);
+    await writeAudit(config, {
+      event: "classifier_input",
+      toolName: subject.toolName,
+      actionSummary: subject.actionSummary,
+      actionHash: subject.actionHash,
+      ...(context.toolCallId !== undefined ? { toolCallId: context.toolCallId } : {}),
+      model: { provider: getString(record.provider), id: getString(record.id) },
+      input,
+    });
+  }
 
   const controller = new AbortController();
   const response = await withTimeout(
-    completeSimple(
-      model,
-      {
-        systemPrompt: buildSystemPrompt(config),
-        messages: [
-          {
-            role: "user",
-            content: buildProjectedContext(ctx, subject, context),
-            timestamp: Date.now(),
-          },
-        ],
-      },
-      {
-        temperature: 0,
-        ...auth,
-        signal: controller.signal,
-      },
-    ),
+    completeSimple(model, input, {
+      temperature: 0,
+      ...auth,
+      signal: controller.signal,
+    }),
     config.classifierTimeoutSeconds * 1000,
     controller,
   );

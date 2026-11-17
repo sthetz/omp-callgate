@@ -137,8 +137,13 @@ await test("config saves only non-default values", () => {
     const full = loadConfig(file);
     assert.equal(full.notice, undefined);
 
-    saveConfig({ ...full.config, reviewer: "ai", readRoots: ["/nix/store"] }, file);
-    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { reviewer: "ai", readRoots: ["/nix/store"] });
+    saveConfig({ ...full.config, reviewer: "ai", readRoots: ["/nix/store"], auditReviewerInput: true }, file);
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), {
+      reviewer: "ai",
+      readRoots: ["/nix/store"],
+      auditReviewerInput: true,
+    });
+    assert.equal(loadConfig(file).config.auditReviewerInput, true);
 
     writeFileSync(file, JSON.stringify({ classifierTimeoutSeconds: 45 }));
     const slow = loadConfig(file);

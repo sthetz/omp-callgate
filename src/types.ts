@@ -20,6 +20,7 @@ export interface CallgateConfig {
   deny: string[];
   environment: string;
   audit: boolean;
+  auditReviewerInput: boolean;
 }
 
 export interface ClassifierDecision {
@@ -123,6 +124,7 @@ export interface AuditEntry {
   actionSummary: string;
   actionHash: string;
   outcome: "allow" | "deny";
+  toolCallId?: string;
   classifierDecision?: ClassifierDecision;
   humanDecision?: string;
   reason?: string;
@@ -136,6 +138,20 @@ export interface AuditEntry {
   ruleId?: string;
   ruleSource?: string;
   durationMs?: number;
+}
+
+/** The exact prompt passed to the classifier, before any provider serialization. */
+export interface ClassifierInputEntry {
+  event: "classifier_input";
+  toolName: string;
+  actionSummary: string;
+  actionHash: string;
+  toolCallId?: string;
+  model: { provider?: string; id?: string };
+  input: {
+    systemPrompt: string;
+    messages: { role: "user"; content: string; timestamp: number }[];
+  };
 }
 
 /** An lsp result was replaced because it showed source lines the agent may not read without review. */

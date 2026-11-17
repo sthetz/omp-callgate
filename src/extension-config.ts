@@ -18,6 +18,7 @@ export const DEFAULT_CONFIG: CallgateConfig = {
   deny: [],
   environment: "",
   audit: true,
+  auditReviewerInput: false,
 };
 
 // OMP blocks a tool call whose extension handler runs past
@@ -73,6 +74,7 @@ export function normalizeConfig(raw: unknown): CallgateConfig {
     deny: stringArray(record.deny),
     environment: typeof record.environment === "string" ? record.environment : "",
     audit: record.audit !== false,
+    auditReviewerInput: record.auditReviewerInput === true,
   };
 }
 
