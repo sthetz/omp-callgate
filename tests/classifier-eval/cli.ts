@@ -7,17 +7,26 @@ import type { ClassifierClient } from "../../src/classifier.js";
 import { DEFAULT_CONFIG, extensionRoot } from "../../src/extension-config.js";
 import { buildSystemPrompt } from "../../src/prompt.js";
 import type { ExtensionContextLike } from "../../src/types.js";
-import { runClassifierEval, type ClassifierEvalMetrics, type ClassifierEvalSummary } from "./run.js";
+import {
+  runClassifierEval,
+  type ClassifierEvalMetrics,
+  type ClassifierEvalSummary,
+  type ClassifierEvalTemplate,
+} from "./run.js";
 import { adaptTsBenchShortlist, parseTsBenchShortlist } from "./ts-bench.js";
+import { TS_GUARD_CALLGATE_TEMPLATE, TS_GUARD_SOURCE, TS_GUARD_TEMPLATE } from "./ts-guard.js";
 
-export const USAGE = "Usage: npm run eval:classifier -- --cases <path> --output <path> [--model <provider/id>]";
+export const USAGE =
+  "Usage: npm run eval:classifier -- --cases <path> --output <path> [--model <provider/id>] [--template callgate|ts-guard|ts-guard-callgate]";
 
-export function parseArgs(args: string[]): { cases: string; output: string; model?: string } | null {
+export function parseArgs(
+  args: string[],
+): { cases: string; output: string; model?: string; template: ClassifierEvalTemplate } | null {
   if (args.length === 1 && args[0] === "--help") return null;
   const values: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
-    if (!flag || !["--cases", "--output", "--model"].includes(flag) || values[flag] !== undefined) {
+    if (!flag || !["--cases", "--output", "--model", "--template"].includes(flag) || values[flag] !== undefined) {
       throw new Error(`Invalid argument: ${flag ?? ""}\n${USAGE}`);
     }
     const value = args[++i];
@@ -25,9 +34,14 @@ export function parseArgs(args: string[]): { cases: string; output: string; mode
     values[flag] = value;
   }
   if (!values["--cases"] || !values["--output"]) throw new Error(`--cases and --output are required\n${USAGE}`);
+  const template = values["--template"] ?? "callgate";
+  if (template !== "callgate" && template !== "ts-guard" && template !== "ts-guard-callgate") {
+    throw new Error(`Unknown template: ${template}\n${USAGE}`);
+  }
   return {
     cases: values["--cases"],
     output: values["--output"],
+    template,
     ...(values["--model"] ? { model: values["--model"] } : {}),
   };
 }
@@ -38,12 +52,16 @@ function sha256(value: string | Buffer): string {
 
 function counts(m: ClassifierEvalMetrics): string {
   const ids = (items: string[]) => `${items.length}${items.length ? ` [${items.join(", ")}]` : ""}`;
-  return `cases ${m.caseIds.length}; raw false allows ${ids(m.rawFalseAllows)}; final false allows ${ids(m.falseAllows)}; false denies ${ids(m.falseDenies)}; failures ${ids(m.failures)}; correct allows ${m.correctAllows.length}; correct denies ${m.correctDenies.length}; missing risk_level ${m.missing.risk_level}, user_authorization ${m.missing.user_authorization}, rationale ${m.missing.rationale}; latency median ${m.latencyMs.median ?? "n/a"} ms, p90 ${m.latencyMs.p90 ?? "n/a"} ms`;
+  const missing = m.missing
+    ? `missing risk_level ${m.missing.risk_level}, user_authorization ${m.missing.user_authorization}, rationale ${m.missing.rationale}`
+    : "callgate metadata n/a (native TS-Guard)";
+  return `cases ${m.caseIds.length}; raw false allows ${ids(m.rawFalseAllows)}; final false allows ${ids(m.falseAllows)}; false denies ${ids(m.falseDenies)}; failures ${ids(m.failures)}; correct allows ${m.correctAllows.length}; correct denies ${m.correctDenies.length}; ${missing}; latency median ${m.latencyMs.median ?? "n/a"} ms, p90 ${m.latencyMs.p90 ?? "n/a"} ms`;
 }
 
-export function formatSummary(summary: ClassifierEvalSummary): string {
+export function formatSummary(summary: ClassifierEvalSummary, template: ClassifierEvalTemplate): string {
+  const label = template === "ts-guard" ? "ts-guard native" : "ts-guard-callgate adapted";
   return [
-    `Classifier eval: ${counts(summary)}`,
+    `Classifier eval${template === "callgate" ? "" : ` [${label}, strict]`}: ${counts(summary)}`,
     "Source configuration:",
     ...Object.entries(summary.bySourceConfiguration).map(([name, m]) => `  ${name}: ${counts(m)}`),
     "Tags:",
@@ -137,6 +155,7 @@ export async function executeEval(
   };
   const { results, summary } = await runClassifierEval(inputs, config, {
     model,
+    template: parsed.template,
     clientForCase: () => client,
     clock: hooks.clock ?? (() => performance.now()),
   });
@@ -148,12 +167,28 @@ export async function executeEval(
       sourceRevisions: revisions,
       codeRevision: git("rev-parse", "HEAD"),
       treeDirty: Boolean(git("status", "--porcelain", "--untracked-files=normal")),
-      systemPromptSha256: sha256(buildSystemPrompt(config)),
+      template: parsed.template,
+      ...(parsed.template !== "callgate"
+        ? {
+            promptTemplateSha256: sha256(
+              parsed.template === "ts-guard-callgate" ? TS_GUARD_CALLGATE_TEMPLATE : TS_GUARD_TEMPLATE,
+            ),
+            promptTemplateSource: {
+              ...TS_GUARD_SOURCE,
+              ...(parsed.template === "ts-guard-callgate" ? { adaptation: "callgate-authorization-v1" } : {}),
+            },
+            scoring: "ts-guard-official-composite-strict",
+          }
+        : { systemPromptSha256: sha256(buildSystemPrompt(config)) }),
       model: modelRef,
       temperature: 0,
       timeoutSeconds: config.classifierTimeoutSeconds,
       timestamp: (hooks.now ?? (() => new Date()))().toISOString(),
-      inferenceSettings: { temperature: 0, timeoutSeconds: config.classifierTimeoutSeconds },
+      inferenceSettings: {
+        temperature: 0,
+        ...(parsed.template !== "callgate" ? { maxTokens: 2048 } : {}),
+        timeoutSeconds: config.classifierTimeoutSeconds,
+      },
     },
     results,
     summary,
@@ -169,5 +204,5 @@ export async function executeEval(
     2,
   );
   writeFileSync(parsed.output, `${json}\n`, "utf8");
-  print(redact(formatSummary(summary)));
+  print(redact(formatSummary(summary, parsed.template)));
 }
