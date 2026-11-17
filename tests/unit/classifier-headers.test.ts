@@ -15,6 +15,7 @@ const config: CallgateConfig = {
   deny: [],
   environment: "",
   audit: false,
+  auditReviewerInput: false,
 };
 
 const subject = {

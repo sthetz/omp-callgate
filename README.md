@@ -188,6 +188,7 @@ An answer that allows a `high`-risk action without `high` user authorization, or
 | `allow`, `deny` | `[]` | Guidance lines for the classifier. |
 | `environment` | `""` | A description of your environment for the classifier. |
 | `audit` | `true` | Write the audit log. |
+| `auditReviewerInput` | `false` | With `audit` enabled, record exact classifier prompts for debugging. May contain sensitive text. |
 
 `readRoots` saves a classifier call for reads of things like dependency sources:
 
@@ -210,6 +211,20 @@ Every decision is appended as a line of JSON to `logs/omp-callgate.jsonl` in the
 - the command as actually run, if pinning rewrote it (`pinnedCommand`, `pinnedCwd`).
 
 A `shell_latch` event records when the bash fast path turned off for a session, and a `result_withheld` event an `lsp` result the agent did not see because it showed source lines from a file it may not read without review ([details](docs/fast-paths.md#language-server-queries)), and an `lsp_edit_mismatch` event a previewed rename whose result changed more than its preview listed. The log holds the commands and paths your agent used, so treat it as private.
+
+### Debugging reviewer context
+
+To investigate a reviewer missing task scope or explicit permission, temporarily set this in `config.jsonc`, then run `/callgate status` to reload it:
+
+```json
+{ "audit": true, "auditReviewerInput": true }
+```
+
+Each new classifier request appends a `classifier_input` event **before** calling the model, so the prompt remains available even if the request fails. It includes the resolved model's provider and ID, action hash, tool call ID when supplied by OMP, and `input`: the exact `systemPrompt` and `messages` passed to the classifier client, before provider serialization. This is the projected context the reviewer sees, not the full session transcript.
+
+Match the event to its decision using `toolCallId` when available, or the action hash and timestamps. A decision with route `classifier_cache` reused an earlier verdict: no new request or input event is generated. Inspect `input.messages[0].content` to see whether your latest permission and earlier task scope actually reached the reviewer.
+
+**Privacy:** transport API keys, headers and environment variables are not logged, but prompts include user messages, tool arguments and configured guidance verbatim as sent. These can contain secrets. Keep the log private, set `auditReviewerInput` back to `false` after collecting evidence, and remove sensitive captured logs before sharing them. Disabling the setting does not remove existing entries.
 
 ## Development
 

@@ -587,6 +587,7 @@ async function auditDecision(decision: Decision, started: number, pinnedInputCha
     actionSummary: subject.actionSummary,
     actionHash: subject.actionHash,
     outcome: decision.outcome,
+    ...(decision.call.toolCallId !== undefined ? { toolCallId: decision.call.toolCallId } : {}),
     ...(classifier && classifier.outcome !== "failure" ? { classifierDecision: classifier.decision } : {}),
     ...(human ? { humanDecision: human.approved ? human.persistence : human.state } : {}),
     ...((decision.auditReason ?? decision.reason) ? { reason: decision.auditReason ?? decision.reason } : {}),
@@ -749,6 +750,7 @@ export async function apply(
         agentMessage: options.agentMessage,
         rule: decision.staticVerdict?.escalation?.rule ?? undefined,
         ruleTextOnly: decision.staticVerdict?.escalation?.textOnly,
+        toolCallId: decision.call.toolCallId,
       });
       // Cache it only if nothing the key stands for changed while the
       // classifier ran: a message the user sent meanwhile may or may not

@@ -16,5 +16,8 @@
   "allow": [],
   "deny": [],
   "environment": "",
-  "audit": true
+  "audit": true,
+  // Debug only: logs exact classifier prompts, including potentially sensitive text.
+  // Requires audit: true. Disable again after collecting the problematic decision.
+  "auditReviewerInput": false
 }

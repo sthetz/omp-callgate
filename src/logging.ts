@@ -4,6 +4,7 @@ import { logPath } from "./extension-config.js";
 import type {
   AuditEntry,
   CallgateConfig,
+  ClassifierInputEntry,
   LspEditMismatchEntry,
   ResultWithheldEntry,
   ShellLatchEntry,
@@ -11,7 +12,7 @@ import type {
 
 export async function writeAudit(
   config: CallgateConfig,
-  entry: AuditEntry | LspEditMismatchEntry | ResultWithheldEntry | ShellLatchEntry,
+  entry: AuditEntry | ClassifierInputEntry | LspEditMismatchEntry | ResultWithheldEntry | ShellLatchEntry,
 ): Promise<void> {
   if (!config.audit) {
     return;

@@ -76,6 +76,11 @@
     "audit": {
       "type": "boolean",
       "default": true
+    },
+    "auditReviewerInput": {
+      "type": "boolean",
+      "default": false,
+      "description": "With audit enabled, log the exact classifier prompt before each request. May contain sensitive user text and tool arguments; credentials from transport options are not logged."
     }
   }
 }
