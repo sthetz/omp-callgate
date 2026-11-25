@@ -49,9 +49,9 @@ await test("the OMP boundary validates events, contexts, tools, session data and
   };
   const customCtx = canonicalContext({
     ui: {
-      custom: (factory: (...args: unknown[]) => unknown) => {
-        factory(tuiHost, { fg: () => 42 }, { matches: "not a function" }, () => undefined);
-        return Promise.resolve("picked");
+      custom: async (factory: (...args: unknown[]) => unknown) => {
+        await factory(tuiHost, { fg: () => 42 }, { matches: "not a function" }, () => undefined);
+        return "picked";
       },
     },
   });
@@ -72,9 +72,9 @@ await test("the OMP boundary validates events, contexts, tools, session data and
   ] as const) {
     const keysCtx = canonicalContext({
       ui: {
-        custom: (factory: (...args: unknown[]) => unknown) => {
-          factory({}, {}, { matches: () => answer }, () => undefined);
-          return Promise.resolve(undefined);
+        custom: async (factory: (...args: unknown[]) => unknown) => {
+          await factory({}, {}, { matches: () => answer }, () => undefined);
+          return undefined;
         },
       },
     });

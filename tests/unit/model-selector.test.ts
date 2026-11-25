@@ -78,19 +78,23 @@ await test("callgate model command uses the OMP custom selector in TUI mode", as
           usedSelect = true;
           return undefined;
         },
-        custom: async (factory) =>
-          new Promise((resolve) => {
-            usedCustom = true;
-            const component = factory(
-              { requestRender: () => {} },
-              { fg: (_name: string, text: string) => text },
-              {},
-              resolve,
-            ) as { render: (width: number) => string[]; handleInput: (data: string) => void };
-            rendered = component.render(80);
-            component.handleInput("review-provider/review-model");
-            component.handleInput("\n");
-          }),
+        custom: async (factory) => {
+          usedCustom = true;
+          let selection: { value: Parameters<Parameters<typeof factory>[3]>[0] } | undefined;
+          const component = (await factory(
+            { requestRender: () => {} },
+            { fg: (_name: string, text: string) => text },
+            {},
+            (value) => {
+              selection = { value };
+            },
+          )) as { render: (width: number) => string[]; handleInput: (data: string) => void };
+          rendered = component.render(80);
+          component.handleInput("review-provider/review-model");
+          component.handleInput("\n");
+          assert.ok(selection, "Enter should close the picker");
+          return selection.value;
+        },
       },
       modelRegistry: {
         getAvailable: () => [
@@ -143,21 +147,22 @@ await test("model selector truncates every rendered line to the terminal width",
       mode: "tui",
       ui: {
         notify: () => {},
-        custom: async (factory) =>
-          new Promise((resolve) => {
-            const component = factory(
-              { requestRender: () => {} },
-              { fg: (_name: string, text: string) => text },
-              {},
-              resolve,
-            ) as { render: (width: number) => string[]; handleInput: (data: string) => void };
-            // A model id long enough that the rendered row would overflow a
-            // narrow terminal if lines were not truncated.
-            rendered = component.render(20);
-            // Resolve the custom UI promise (select the current item) so the
-            // command handler can finish; otherwise the test hangs forever.
-            component.handleInput("\n");
-          }),
+        custom: async (factory) => {
+          let selection: { value: Parameters<Parameters<typeof factory>[3]>[0] } | undefined;
+          const component = (await factory(
+            { requestRender: () => {} },
+            { fg: (_name: string, text: string) => text },
+            {},
+            (value) => {
+              selection = { value };
+            },
+          )) as { render: (width: number) => string[]; handleInput: (data: string) => void };
+          // A long model id must fit even in a narrow terminal.
+          rendered = component.render(20);
+          component.handleInput("\n");
+          assert.ok(selection, "Enter should close the picker");
+          return selection.value;
+        },
       },
       modelRegistry: {
         getAvailable: () => [

@@ -90,14 +90,17 @@ function canonicalTheme(value: unknown): ThemeLike {
     : {};
 }
 
-function canonicalKeybindings(value: unknown): KeybindingsLike {
+export function canonicalKeybindings(value: unknown, decodeKey?: (data: string) => unknown): KeybindingsLike {
   const record = toRecord(value);
   const matches = record.matches;
   return typeof matches === "function"
     ? {
         matches: (data, key) => {
+          // Rows components still receive raw bytes; OMP 19.2+ matches KeyEvents.
+          const input = decodeKey ? decodeKey(data) : data;
+          if (input === null || input === undefined) return false;
           // As before: only no answer falls back to the built-in keys.
-          const matched: unknown = matches.call(record, data, key);
+          const matched: unknown = matches.call(record, input, key);
           return matched === undefined || matched === null ? undefined : Boolean(matched);
         },
       }
@@ -163,8 +166,15 @@ export function canonicalContext(value: unknown): ExtensionContextLike | null {
       // The extension-supplied factory, not OMP, determines this result type.
       (await custom.call(
         uiRecord,
-        (tui: unknown, theme: unknown, keybindings: unknown, done: (result: T) => void) =>
-          factory(canonicalTui(tui), canonicalTheme(theme), canonicalKeybindings(keybindings), done),
+        async (tui: unknown, theme: unknown, keybindings: unknown, done: (result: T) => void) => {
+          let decode: ((data: string) => unknown) | undefined;
+          if (typeof toRecord(keybindings).matchesId === "function") {
+            // Version-specific module: a static import would break OMP versions before 19.2.
+            const { decodeKey } = await import("@oh-my-pi/pi-tui/driver/input/keys");
+            decode = (data) => decodeKey(data, { kitty: true, backspaceIsCtrl: false });
+          }
+          return factory(canonicalTui(tui), canonicalTheme(theme), canonicalKeybindings(keybindings, decode), done);
+        },
         optionsOverride,
       )) as T;
   }

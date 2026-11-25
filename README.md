@@ -71,6 +71,8 @@ Optional OMP QA reporting is an exception to stopping, not to authorization. A d
 | `/callgate rules [program \| rule id]` | List the command rules in use and the file each comes from, or show one. |
 | `/callgate explain <tool> [args]` | Show what would happen to a tool call, without running it. `args` is a path, a JSON object, or a bash command: `/callgate explain read ~/.ssh/id_ed25519`, `/callgate explain ls -la`. |
 
+In the model picker, type to search, use ↑/↓ to navigate, Enter to select, or Esc/Ctrl+C to cancel without changing the saved model. OMP's configured selection keybindings are honored, including the event-based keymap introduced in OMP 19.2.
+
 ## How a tool call is decided
 
 The first row that applies decides. `/callgate explain` runs the same decision function and prints its selected route; the audit log records that route. When you are asked, the log records your answer with route `human`.
