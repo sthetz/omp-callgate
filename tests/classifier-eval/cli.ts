@@ -9,24 +9,34 @@ import { buildSystemPrompt } from "../../src/prompt.js";
 import type { ExtensionContextLike } from "../../src/types.js";
 import {
   runClassifierEval,
+  CLASSIFIER_EVAL_THINKING_LEVELS,
   type ClassifierEvalMetrics,
   type ClassifierEvalSummary,
   type ClassifierEvalTemplate,
+  type ClassifierEvalThinking,
 } from "./run.js";
 import { adaptTsBenchShortlist, parseTsBenchShortlist } from "./ts-bench.js";
 import { TS_GUARD_CALLGATE_TEMPLATE, TS_GUARD_SOURCE, TS_GUARD_TEMPLATE } from "./ts-guard.js";
 
 export const USAGE =
-  "Usage: npm run eval:classifier -- --cases <path> --output <path> [--model <provider/id>] [--template callgate|ts-guard|ts-guard-callgate]";
+  "Usage: npm run eval:classifier -- --cases <path> --output <path> [--model <provider/id>] [--template callgate|ts-guard|ts-guard-callgate] [--thinking off|minimal|low|medium|high|xhigh|max]";
 
-export function parseArgs(
-  args: string[],
-): { cases: string; output: string; model?: string; template: ClassifierEvalTemplate } | null {
+export function parseArgs(args: string[]): {
+  cases: string;
+  output: string;
+  model?: string;
+  template: ClassifierEvalTemplate;
+  thinking?: ClassifierEvalThinking;
+} | null {
   if (args.length === 1 && args[0] === "--help") return null;
   const values: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
-    if (!flag || !["--cases", "--output", "--model", "--template"].includes(flag) || values[flag] !== undefined) {
+    if (
+      !flag ||
+      !["--cases", "--output", "--model", "--template", "--thinking"].includes(flag) ||
+      values[flag] !== undefined
+    ) {
       throw new Error(`Invalid argument: ${flag ?? ""}\n${USAGE}`);
     }
     const value = args[++i];
@@ -38,11 +48,16 @@ export function parseArgs(
   if (template !== "callgate" && template !== "ts-guard" && template !== "ts-guard-callgate") {
     throw new Error(`Unknown template: ${template}\n${USAGE}`);
   }
+  const thinking = values["--thinking"];
+  if (thinking !== undefined && !CLASSIFIER_EVAL_THINKING_LEVELS.some((level) => level === thinking)) {
+    throw new Error(`Unknown thinking level: ${thinking}\n${USAGE}`);
+  }
   return {
     cases: values["--cases"],
     output: values["--output"],
     template,
     ...(values["--model"] ? { model: values["--model"] } : {}),
+    ...(thinking !== undefined ? { thinking: thinking as ClassifierEvalThinking } : {}),
   };
 }
 
@@ -156,6 +171,7 @@ export async function executeEval(
   const { results, summary } = await runClassifierEval(inputs, config, {
     model,
     template: parsed.template,
+    thinking: parsed.thinking,
     clientForCase: () => client,
     clock: hooks.clock ?? (() => performance.now()),
   });
@@ -186,6 +202,7 @@ export async function executeEval(
       timestamp: (hooks.now ?? (() => new Date()))().toISOString(),
       inferenceSettings: {
         temperature: 0,
+        thinking: parsed.thinking ?? null,
         ...(parsed.template !== "callgate" ? { maxTokens: 2048 } : {}),
         timeoutSeconds: config.classifierTimeoutSeconds,
       },

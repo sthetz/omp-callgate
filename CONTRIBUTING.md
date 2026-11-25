@@ -72,6 +72,35 @@ can contain sensitive case content. Public cases must be synthetic or cleared
 for redistribution and must not contain private data. These are development
 sets, not a frozen holdout or a model leaderboard.
 
+#### Comparing thinking levels
+
+Use `--thinking off|minimal|low|medium|high|xhigh|max` with any evaluation
+template to request a reasoning level independently of the main agent's
+thinking setting. For example, compare levels on the same model and dataset:
+
+```bash
+for level in off low medium high xhigh; do
+  npm run eval:classifier:project -- \
+    --model provider/model-id \
+    --thinking "$level" \
+    --output "/tmp/classifier-${level}.json"
+done
+```
+
+`off` sends `disableReasoning: true`; other levels send `reasoning` through
+OMP's unified model client. Supported levels and their wire mappings depend
+on the model's registered capabilities and provider. The artifact records
+the requested level in `metadata.inferenceSettings.thinking`, not a measured
+or guaranteed effective thinking depth. Omitting the flag leaves request
+options unchanged and records `null`, which is distinct from explicit `off`.
+
+This option changes only the test harness, not production callgate settings.
+Temperature, timeouts and output limits stay unchanged: the default timeout
+is 25 seconds and native TS-Guard templates cap output at 2,048 tokens.
+Compare failures and latency as well as false allows and false denies when
+testing higher thinking levels. The loop above makes model requests but
+never executes the actions described by the cases.
+
 For multi-message project cases, `original_record.earlier_user_messages` is an
 optional array of genuine user messages in chronological order;
 `original_record.instruction` is the latest user message. The callgate adapter

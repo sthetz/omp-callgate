@@ -11,6 +11,9 @@ import { buildTsGuardPrompt, parseTsGuardResponse, type TsGuardJudgment, type Ts
 
 export type ClassifierEvalTemplate = "callgate" | TsGuardTemplate;
 
+export const CLASSIFIER_EVAL_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ClassifierEvalThinking = (typeof CLASSIFIER_EVAL_THINKING_LEVELS)[number];
+
 export interface ClassifierEvalResult {
   caseId: string;
   expectedOutcome: TsBenchExpectedOutcome;
@@ -170,6 +173,7 @@ export async function runClassifierEval(
     clientForCase: (input: TsBenchClassifierInput) => ClassifierClient;
     clock: () => number;
     template?: ClassifierEvalTemplate;
+    thinking?: ClassifierEvalThinking;
   },
 ): Promise<{ results: ClassifierEvalResult[]; summary: ClassifierEvalSummary }> {
   const results: ClassifierEvalResult[] = [];
@@ -184,7 +188,16 @@ export async function runClassifierEval(
     const start = options.clock();
     let active = true;
     try {
-      const client = options.clientForCase(input);
+      const baseClient = options.clientForCase(input);
+      const thinking = options.thinking;
+      const client: ClassifierClient =
+        thinking === undefined
+          ? baseClient
+          : (model, context, requestOptions) =>
+              baseClient(model, context, {
+                ...requestOptions,
+                ...(thinking === "off" ? { disableReasoning: true } : { reasoning: thinking }),
+              });
       if (options.template && options.template !== "callgate") {
         result.finalDecision = await classifyNative(input, config, options.model, client, result, options.template);
       } else {
