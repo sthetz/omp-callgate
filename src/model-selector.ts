@@ -30,12 +30,13 @@ function toTuiTextUtils(moduleValue: unknown): TuiTextUtils | null {
     return null;
   }
   const record = moduleValue as Record<string, unknown>;
-  if (typeof record.visibleWidth !== "function" || typeof record.truncateToWidth !== "function") {
+  const truncate = record.truncateToWidth ?? record.truncate;
+  if (typeof record.visibleWidth !== "function" || typeof truncate !== "function") {
     return null;
   }
   return {
     visibleWidth: record.visibleWidth as TuiTextUtils["visibleWidth"],
-    truncateToWidth: record.truncateToWidth as TuiTextUtils["truncateToWidth"],
+    truncateToWidth: truncate as TuiTextUtils["truncateToWidth"],
   };
 }
 
@@ -68,10 +69,20 @@ function selectTuiTextUtils(moduleValue: unknown): TuiTextUtils {
   return toTuiTextUtils(moduleValue) ?? safeFallbackTextUtils;
 }
 
-async function loadTuiTextUtils(): Promise<TuiTextUtils> {
+// These version-specific exports cannot be imported statically: older OMP
+// versions lack text/width, while OMP 19.2+ no longer exports them at the root.
+async function loadTuiTextUtils(
+  loadWidthModule: () => Promise<unknown> = () => import("@oh-my-pi/pi-tui/text/width"),
+  loadRootModule: () => Promise<unknown> = () => import("@oh-my-pi/pi-tui"),
+): Promise<TuiTextUtils> {
   try {
-    // A literal specifier, so OMP can map it to its bundled host package.
-    return selectTuiTextUtils(await import("@oh-my-pi/pi-tui"));
+    const textUtils = toTuiTextUtils(await loadWidthModule());
+    if (textUtils) return textUtils;
+  } catch {
+    // Try the legacy exports when the modern module is unavailable.
+  }
+  try {
+    return selectTuiTextUtils(await loadRootModule());
   } catch {
     return safeFallbackTextUtils;
   }

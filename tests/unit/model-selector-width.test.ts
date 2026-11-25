@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DEFAULT_CONFIG } from "../../src/extension-config.js";
 import { modelSelectorInternals } from "../../src/model-selector.js";
 import type { CallgateConfig, ExtensionContextLike } from "../../src/types.js";
 import { test } from "node:test";
@@ -121,4 +122,44 @@ await test("the model selector fits every line with the host's width helpers, an
   }
   assert.equal(piLikeTextUtils.visibleWidth(rendered[0] ?? ""), 20);
   assert.equal(piLikeTextUtils.visibleWidth(rendered.at(-1) ?? ""), 20);
+});
+
+for (const host of ["current", "legacy"] as const) {
+  await test(`${host} OMP text exports preserve picker symbols and Unicode model names`, async () => {
+    const textUtils = await modelSelectorInternals.loadTuiTextUtils(
+      async () => {
+        if (host === "legacy") throw new Error("text/width is unavailable");
+        return { visibleWidth: piLikeTextUtils.visibleWidth, truncate: piLikeTextUtils.truncateToWidth };
+      },
+      async () => (host === "legacy" ? piLikeTextUtils : {}),
+    );
+    const component = modelSelectorInternals.createSelectorComponent(
+      {},
+      [{ value: "provider/模型😀", provider: "provider", id: "模型😀" }],
+      { model: { provider: "provider", id: "模型😀" } },
+      DEFAULT_CONFIG,
+      {},
+      {},
+      textUtils,
+      () => {},
+    );
+    const lines = component.render(80);
+    const rendered = lines.join("\n");
+    for (const symbol of ["↑↓", "•", "→", "✓", "模型😀"]) {
+      assert.ok(rendered.includes(symbol), `picker lost ${JSON.stringify(symbol)} with ${host} OMP exports`);
+    }
+    for (const line of lines) {
+      assert.ok(testVisibleWidth(line) <= 80, `picker line exceeds terminal width: ${JSON.stringify(line)}`);
+    }
+  });
+}
+
+await test("unavailable host text modules still give width-safe fallback rendering", async () => {
+  const unavailable = async () => {
+    throw new Error("host module is unavailable");
+  };
+  const textUtils = await modelSelectorInternals.loadTuiTextUtils(unavailable, unavailable);
+  const rendered = modelSelectorInternals.fitLineToWidth("\u001b[31m↑↓ 中文😀abcdef\u001b[0m", 8, textUtils);
+  assert.match(rendered, /^[\x20-\x7e]*$/);
+  assert.ok(rendered.length <= 8, `fallback line exceeds terminal width: ${JSON.stringify(rendered)}`);
 });

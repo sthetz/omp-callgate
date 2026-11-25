@@ -21,3 +21,7 @@ declare module "@oh-my-pi/pi-tui/driver/input/keys" {
     readonly text?: string;
   } | null;
 }
+declare module "@oh-my-pi/pi-tui/text/width" {
+  export function visibleWidth(text: string): number;
+  export function truncate(text: string, width: number): string;
+}

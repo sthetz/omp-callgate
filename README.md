@@ -74,6 +74,7 @@ Optional OMP QA reporting is an exception to stopping, not to authorization. A d
 | `/callgate explain <tool> [args]` | Show what would happen to a tool call, without running it. `args` is a path, a JSON object, or a bash command: `/callgate explain read ~/.ssh/id_ed25519`, `/callgate explain ls -la`. |
 
 In the model picker, type to search, use ↑/↓ to navigate, Enter to select, or Esc/Ctrl+C to cancel without changing the saved model. OMP's configured selection keybindings are honored, including the event-based keymap introduced in OMP 19.2.
+The picker preserves Unicode model names and navigation symbols while fitting the terminal width on current and older OMP versions.
 
 ## How a tool call is decided
 
