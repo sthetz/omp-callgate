@@ -2,6 +2,14 @@
 // bundled copies. None are installed for development.
 declare module "@oh-my-pi/pi-ai";
 declare module "@oh-my-pi/pi-tui";
+declare module "@oh-my-pi/pi-tui/driver/session" {
+  export function notifyTerminal(message: {
+    title: string;
+    body: string;
+    type: string;
+    actions: "focus";
+  }): void;
+}
 declare module "@oh-my-pi/pi-tui/driver/input/keys" {
   export function decodeKey(
     data: string,

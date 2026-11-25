@@ -116,20 +116,34 @@ export async function requestHumanApproval(
     .join("\n");
 
   const choices = [ALLOW_ONCE, ALLOW_EXACT, REJECT, REJECT_WITH_REASON, ...(ctx.abort ? [REJECT_AND_STOP] : [])];
-  // The cursor starts on Reject, so Enter without reading rejects. When
-  // OMP's selector times out it chooses the highlighted option, whichever the
-  // user moved to; it calls onTimeout first, so an answer after that is the
-  // timeout's, not the user's, and rejects.
+  // OMP's selector chooses the highlighted option on timeout, even without
+  // user input. Its onTimeout callback runs first, so a timed-out selection
+  // must reject even though Allow Once is highlighted by default.
   // Set by onTimeout while select() waits; typed boolean, since the compiler
   // can't see a callback's assignment and would treat it as always false.
   let timedOut = false as boolean;
   const title = options.title === undefined ? "omp-callgate" : displayValue(options.title, 120);
+  if (ctx.mode === "tui") {
+    try {
+      // Keep the specifier literal so OMP resolves its bundled host module.
+      const { notifyTerminal } = await import("@oh-my-pi/pi-tui/driver/session");
+      notifyTerminal({
+        title: "omp-callgate",
+        body: "Waiting for tool approval",
+        type: "approval",
+        actions: "focus",
+      });
+    } catch {
+      // A notification failure must not prevent the approval dialog.
+      ctx.ui.notify?.("omp-callgate could not send a terminal notification.", "warning");
+    }
+  }
   const selected = await ctx.ui.select(`${title}\n${details}`, choices, {
     timeout: options.timeoutSeconds * 1000,
     onTimeout: () => {
       timedOut = true;
     },
-    initialIndex: choices.indexOf(REJECT),
+    initialIndex: choices.indexOf(ALLOW_ONCE),
   });
 
   if (timedOut || !selected) {

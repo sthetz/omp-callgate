@@ -1175,9 +1175,8 @@ await test("block, ask and review rules take precedence over every fast path", a
     assert.deepEqual(await run("git tag -d v1", { reviewer: "manual" }, { hasUI: true, ui }, store), {});
     assert.equal(prompt, "");
     assert.equal(classifierCalls, before);
-    // A prompt nobody answers rejects. The cursor starts on Reject; OMP's
-    // selector, on its timeout, calls onTimeout and then chooses the
-    // highlighted option, here one the user moved to.
+    // A prompt nobody answers rejects, even though Allow Once is highlighted
+    // by default and OMP's selector returns it after calling onTimeout.
     const timeouts: number[] = [];
     const highlighted: string[] = [];
     const unanswered = {
@@ -1202,7 +1201,7 @@ await test("block, ask and review rules take precedence over every fast path", a
     assert.equal(blocked(timedOut), true);
     assert.match(reason(timedOut), /timed out/i);
     assert.deepEqual(timeouts, [7000]);
-    assert.deepEqual(highlighted, ["Reject"]);
+    assert.deepEqual(highlighted, ["Allow Once"]);
 
     // Rules that cannot be read: bash in reviewExemptTools is reviewed too.
     writeFileSync(file, "{ broken");

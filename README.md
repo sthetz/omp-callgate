@@ -51,7 +51,9 @@ When you are asked, the prompt shows the action, the classifier's reason or the 
 - **Reject**, or **Reject With Reason**, which is shown to the agent;
 - **Reject and Stop the Turn**.
 
-The cursor starts on **Reject**, and no answer within `approvalTimeoutSeconds` (default 30) rejects.
+The cursor starts on **Allow Once**, so Enter approves only this call. No answer within `approvalTimeoutSeconds` (default 30) still rejects.
+
+In the TUI, approval prompts also send a terminal notification using the same mechanism as OMP's turn-end ping. Depending on your terminal and multiplexer, this produces a desktop notification, attention indicator or bell. `PI_NOTIFICATIONS=off` suppresses it; OMP's `completion.notify` setting controls turn-end notifications, not these approval pings.
 
 Supplied text in approval prompts is quoted, with terminal controls, Unicode format controls (including direction overrides), and line separators shown as literal escapes. Filenames and commands retain visible `\n`, `\r` and `\t` rather than having them collapsed into spaces. Long fields are bounded and marked `[truncated]`. This formatting is display-only: execution arguments, classifier inputs, and exact-action approval hashes are unchanged.
 
